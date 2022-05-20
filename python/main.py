@@ -2,12 +2,13 @@ import os
 import logging
 import pathlib
 from pathlib import Path
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 import json
 import sqlite3
+import hashlib
 
 cwd = Path.cwd()
 parent = cwd.parent
@@ -47,6 +48,10 @@ def write_to_database(new_item):
 
     conn.close()
 
+def hash256(filename):
+    hashed_name = hashlib.sha256(filename.replace('.jpg', '').encode('utf-8')).hexdigest() + ".jpg"
+    return hashed_name
+
 #GET request
 @app.get("/")
 def root():
@@ -54,24 +59,32 @@ def root():
 
 #POST request (/items)
 @app.post("/items")
-def add_item(name: str = Form(...), category: str = Form(...), image: str = Form(...)):
+def add_item(name: str = Form(...), category: str = Form(...), image: UploadFile = File(...)):
+
+    file_uploaded = images / image.filename
+    hashed_filename = hash256(image)
+
+    with open(save_path, 'r') as buffer:
+        shutil.copyfile(file_uploaded.file, buffer)
+
     newItem = {
     "name": f"{name}",
     "category": f"{category}",
-    "image" : f"{image}"
+    "image" : f"{hashed_filename}"
     }
     write_to_database(newItem)
 
-    logger.info(f"Receive item: {name} {category} {image}")
+    received = {"name":{name}, "category" :{category}, "image": {image}}
+    logger.info(f"Receive item: {received}")
     return {"message": f"item received: {name} "}
 
-#GET request (/image/items_image)
-@app.get("/image/{items_image}")
-async def get_image(items_image):
+#GET request (/image/image_filename)
+@app.get("/image/{image_filename}")
+async def get_image(image_filename):
     # Create image path
-    image = images / items_image
+    image = images / image_filename
 
-    if not items_image.endswith(".jpg"):
+    if not image_filename.endswith(".jpg"):
         raise HTTPException(status_code=400, detail="Image path does not end with .jpg")
 
     if not image.exists():
