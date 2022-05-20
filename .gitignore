@@ -1,0 +1,6 @@
+# Ignore in all files
+__pycache__
+.DS_Store
+
+# Ignore the original database file
+mercari.sqlite3
